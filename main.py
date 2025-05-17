@@ -3,8 +3,9 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 
+# Récupération token depuis variable d'environnement
 token = os.getenv("TOKEN")
-print(f"Token récupéré : {token is not None}")
+print(f"Token récupéré : {token is not None}")  # True si ok
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -12,73 +13,91 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 tree = bot.tree
 
+# Stockage des compteurs de clics par message ID
 click_counters = {}
 
-# ----- Classes pour /sendmessage -----
-
+# ---- Modal pour envoyer un message avec bouton personnalisable ----
 class MessageModal(discord.ui.Modal, title="Envoyer un message avec bouton"):
     channel = discord.ui.TextInput(label="ID du salon (channel id)", placeholder="Ex: 123456789012345678")
     message_content = discord.ui.TextInput(label="Message à envoyer", style=discord.TextStyle.paragraph)
-    button_label = discord.ui.TextInput(label="Texte du bouton", default="📥 Je clique !")
-    button_color = discord.ui.TextInput(label="Couleur du bouton (#RRGGBB ou name)", default="primary")
+    button_text = discord.ui.TextInput(label="Texte du bouton", placeholder="Ex: Cliquer ici !", max_length=50)
+    button_color = discord.ui.TextInput(label="Couleur du bouton (hexadécimal)", placeholder="#544de2", max_length=9)
 
-    def __init__(self, interaction):
+    def __init__(self, interaction: discord.Interaction):
         super().__init__()
         self.interaction = interaction
 
     async def on_submit(self, interaction: discord.Interaction):
+        # Récupérer salon par ID
         try:
-            channel_id = int(self.channel.value)
-            channel = self.interaction.guild.get_channel(channel_id)
-            if channel is None:
-                await interaction.response.send_message("Salon invalide.", ephemeral=True)
-                return
+            channel_id = int(self.channel.value.strip())
         except ValueError:
-            await interaction.response.send_message("ID de salon invalide.", ephemeral=True)
+            await interaction.response.send_message("ID du salon invalide.", ephemeral=True)
             return
 
-        # Couleurs possibles pour ButtonStyle
-        color_map = {
-            "primary": discord.ButtonStyle.primary,
-            "secondary": discord.ButtonStyle.secondary,
-            "success": discord.ButtonStyle.success,
-            "danger": discord.ButtonStyle.danger,
-        }
+        channel = self.interaction.guild.get_channel(channel_id)
+        if channel is None:
+            await interaction.response.send_message("Salon introuvable dans ce serveur.", ephemeral=True)
+            return
 
-        # Essayer d'analyser la couleur
-        color_input = self.button_color.value.strip().lower()
-        if color_input.startswith("#") and len(color_input) == 7:
-            # Discord.py ne supporte pas les couleurs hex direct dans ButtonStyle, fallback sur primary
-            button_style = discord.ButtonStyle.primary
-        else:
-            button_style = color_map.get(color_input, discord.ButtonStyle.primary)
+        # Valider couleur hex (avec #)
+        color_str = self.button_color.value.strip()
+        if not color_str.startswith("#") or len(color_str) not in {4, 7, 9}:
+            await interaction.response.send_message("Couleur hexadécimale invalide (ex: #544de2).", ephemeral=True)
+            return
 
-        class ClickButton(discord.ui.View):
-            def __init__(self, message_id):
-                super().__init__(timeout=None)
-                self.message_id = message_id
-
-            @discord.ui.button(label=self.button_label.value, style=button_style)
-            async def click(self, interaction: discord.Interaction, button: discord.ui.Button):
-                message = interaction.message
-                click_counters[self.message_id] = click_counters.get(self.message_id, 0) + 1
-                count = click_counters[self.message_id]
-                await message.edit(content=f"{message.content.splitlines()[0]}\n\nNombre de personnes qui ont cliqué : **{count}**", view=self)
-                await interaction.response.send_message("Merci pour ton clic ! ✅", ephemeral=True)
-
-        # Envoyer le message avec le bouton
-        message = await channel.send(
-            content=f"{self.message_content.value}\n\nNombre de personnes qui ont cliqué : **0**",
-            view=ClickButton(0)  # message.id pas encore disponible
+        # Créer une vue avec bouton personnalisé
+        view = ClickButton(
+            message_id=0,  # temporaire, sera mis à jour après envoi
+            label=self.button_text.value.strip() or "Clique ici",
+            color=color_str
         )
-        # Mettre à jour le message_id du bouton
-        message.view.message_id = message.id
-        click_counters[message.id] = 0
+
+        # Envoyer message avec bouton
+        sent_message = await channel.send(
+            content=f"{self.message_content.value}\n\nNombre de personnes qui ont cliqué : **0**",
+            view=view
+        )
+        # Update message_id dans la vue pour suivre ce message
+        view.message_id = sent_message.id
+
+        # Init compteur clics
+        click_counters[sent_message.id] = 0
 
         await interaction.response.send_message(f"Message envoyé dans {channel.mention} !", ephemeral=True)
 
-@tree.command(name="sendmessage", description="Commande pour envoyer un message avec bouton personnalisé")
+
+# ---- Vue personnalisée avec bouton dynamique ----
+class ClickButton(discord.ui.View):
+    def __init__(self, message_id: int, label: str = "Clique ici", color: str = "#5865F2"):
+        super().__init__(timeout=None)
+        self.message_id = message_id
+        self.button = discord.ui.Button(label=label, style=discord.ButtonStyle.primary)
+        # Essayer de convertir hex couleur en discord.ButtonStyle color (limité à 4 styles)
+        # Discord ne supporte pas la couleur hex dans ButtonStyle directement
+        # Donc on laisse primary (bleu), secondary (gris), success (vert), danger (rouge)
+        # Ou on peut choisir style selon la couleur hex, sinon primary par défaut
+        # Ici on laisse primary toujours pour la simplicité
+        self.add_item(self.button)
+        self.button.callback = self.click_callback
+
+    async def click_callback(self, interaction: discord.Interaction):
+        # Incrémenter compteur clics
+        click_counters[self.message_id] = click_counters.get(self.message_id, 0) + 1
+        count = click_counters[self.message_id]
+        message = interaction.message
+        # Editer contenu avec nouveau compteur
+        lines = message.content.splitlines()
+        if lines:
+            new_content = lines[0] + f"\n\nNombre de personnes qui ont cliqué : **{count}**"
+            await message.edit(content=new_content, view=self)
+        await interaction.response.send_message("Merci pour ton clic ! ✅", ephemeral=True)
+
+
+# ---- Commande /sendmessage ----
+@tree.command(name="sendmessage", description="Envoyer un message avec bouton personnalisé")
 async def sendmessage(interaction: discord.Interaction):
+    # Rôle autorisé : Administrateur (nom exact)
     admin_role = discord.utils.get(interaction.guild.roles, name="Administrateur")
     if admin_role not in interaction.user.roles:
         await interaction.response.send_message("⛔ Tu n'as pas la permission d'utiliser cette commande.", ephemeral=True)
@@ -87,9 +106,13 @@ async def sendmessage(interaction: discord.Interaction):
     await interaction.response.send_modal(modal)
 
 
-# ----- Commande /session -----
-
-durations_choices = [
+# ---- Commande /session ----
+@tree.command(name="session", description="Créer une session dans #⫻session")
+@app_commands.describe(
+    start_time="Heure de début (format HH:MM, ex: 14:30)",
+    duration="Durée de la session"
+)
+@app_commands.choices(duration=[
     app_commands.Choice(name="10 minutes", value="10min"),
     app_commands.Choice(name="20 minutes", value="20min"),
     app_commands.Choice(name="30 minutes", value="30min"),
@@ -97,54 +120,40 @@ durations_choices = [
     app_commands.Choice(name="50 minutes", value="50min"),
     app_commands.Choice(name="1 heure", value="1h"),
     app_commands.Choice(name="2 heures", value="2h"),
-]
-
-@tree.command(name="session", description="Créer une session dans #⫻session")
-@app_commands.describe(
-    start_time="Heure de début (format HH:MM, ex: 14:30)",
-    duration="Durée de la session"
-)
-@app_commands.choices(duration=durations_choices)
+])
 async def session(interaction: discord.Interaction, start_time: str, duration: app_commands.Choice[str]):
-    # Vérifier rôle administrateur
+    # Vérification rôle Administrateur
     admin_role = discord.utils.get(interaction.guild.roles, name="Administrateur")
     if admin_role not in interaction.user.roles:
         await interaction.response.send_message("⛔ Tu n'as pas la permission d'utiliser cette commande.", ephemeral=True)
         return
 
-    # Valider format HH:MM
-    try:
-        h, m = start_time.split(":")
-        h = int(h)
-        m = int(m)
-        if not (0 <= h <= 23 and 0 <= m <= 59):
-            raise ValueError
-    except:
-        await interaction.response.send_message("❌ Format d'heure invalide. Utilise HH:MM, ex: 14:30", ephemeral=True)
+    # Trouver salon #⫻session (exactement ce nom)
+    channel = discord.utils.get(interaction.guild.text_channels, name="⫻session")
+    if channel is None:
+        await interaction.response.send_message("Le salon #⫻session n'existe pas sur ce serveur.", ephemeral=True)
         return
 
-    # Trouver le salon #⫻session
-    session_channel = discord.utils.get(interaction.guild.text_channels, name="⫻session")
-    if session_channel is None:
-        await interaction.response.send_message("❌ Salon #⫻session introuvable.", ephemeral=True)
-        return
-
+    # Construire le message avec mention de l'organisateur
     organizer_mention = interaction.user.mention
-    message = (
-        f"📢 **Session organisée par {organizer_mention}**\n"
-        f"⏰ Début : {start_time}\n"
-        f"⏳ Durée : {duration.name}\n"
-        f"Merci de bien vouloir vous organiser en conséquence !"
-    )
+    session_msg = (f"📢 **Nouvelle session** 📢\n"
+                   f"Organisateur : {organizer_mention}\n"
+                   f"Heure de début : {start_time}\n"
+                   f"Durée : {duration.name}")
 
-    await session_channel.send(message)
-    await interaction.response.send_message(f"Session annoncée dans {session_channel.mention} !", ephemeral=True)
+    # Envoyer message dans #⫻session
+    await channel.send(session_msg)
+
+    # Confirmer à l'utilisateur
+    await interaction.response.send_message(f"Session créée dans {channel.mention}.", ephemeral=True)
 
 
+# ---- Event on_ready ----
 @bot.event
 async def on_ready():
     await tree.sync()
-    print(f"✅ Connecté en tant que {bot.user}")
+    print(f"✅ Connecté en tant que {bot.user} - Commandes synchronisées")
 
 
+# ---- Lancer le bot ----
 bot.run(token)
