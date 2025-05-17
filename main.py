@@ -1,6 +1,5 @@
 import discord
 from discord.ext import commands
-from keep_alive import keep_alive
 import os
 
 intents = discord.Intents.default()
@@ -22,5 +21,5 @@ async def ping(ctx):
 async def bonjour(ctx):
     await ctx.send(f"👋 Salut {ctx.author.name} !")
 
-keep_alive()
 bot.run(os.getenv("TOKEN"))
+
