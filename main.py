@@ -1,3 +1,11 @@
+import os
+
+token = os.getenv("TOKEN")
+print(f"Token récupéré : {token is not None}")  # Affiche True si token bien récupéré
+
+
+
+
 import discord
 from discord.ext import commands
 from discord import app_commands
