@@ -109,9 +109,10 @@ async def session(interaction: discord.Interaction, start_time: str, duration: a
 
     organizer_mention = interaction.user.mention
     session_msg = (f"📢 **Nouvelle session** 📢\n"
-                   f"Organisateur : {organizer_mention}\n"
-                   f"Heure de début : {start_time}\n"
-                   f"Durée : {duration.name}")
+               f"Organisateur : {organizer_mention}\n"
+               f"Heure de début : {start_time}\n"
+               f"Durée : {duration.name}\n\n"
+               f"@session")
 
     await channel.send(session_msg)
     await interaction.response.send_message(f"Session créée dans {channel.mention}.", ephemeral=True)
