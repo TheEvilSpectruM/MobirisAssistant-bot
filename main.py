@@ -99,6 +99,61 @@ async def sendmessage_error(interaction: discord.Interaction, error):
     else:
         await interaction.response.send_message(f"Une erreur est survenue: {error}", ephemeral=True)
 
+@tree.command(
+    name="session",
+    description="Créer une session avec heure de début, durée et organisateur"
+)
+@app_commands.describe(
+    start_time="Heure de début (format HH:MM, ex: 14:30)",
+    duration="Durée de la session"
+)
+@app_commands.checks.has_role("Administrateur")
+async def session(
+    interaction: discord.Interaction,
+    start_time: str,
+    duration: app_commands.Choice[str]
+):
+    # Valider le format HH:MM
+    try:
+        h, m = start_time.split(":")
+        h = int(h)
+        m = int(m)
+        if not (0 <= h <= 23 and 0 <= m <= 59):
+            raise ValueError
+    except:
+        await interaction.response.send_message("❌ Format d'heure invalide. Utilise HH:MM, ex: 14:30", ephemeral=True)
+        return
+
+    # Trouver le salon #⫻session par nom
+    session_channel = discord.utils.get(interaction.guild.text_channels, name="⫻session")
+    if session_channel is None:
+        await interaction.response.send_message("❌ Salon #⫻session introuvable sur ce serveur.", ephemeral=True)
+        return
+
+    organizer_mention = interaction.user.mention
+    message = (
+        f"📢 **Session organisée par {organizer_mention}**\n"
+        f"⏰ Début : {start_time}\n"
+        f"⏳ Durée : {duration.value}\n"
+        f"Merci de bien vouloir vous organiser en conséquence !"
+    )
+
+    await session_channel.send(message)
+    await interaction.response.send_message(f"Session annoncée dans {session_channel.mention} !", ephemeral=True)
+
+# Ajouter les choix pour la durée
+session._params["duration"] = app_commands.Choice[str]
+session._choices = {
+    "duration": [
+        app_commands.Choice(name="10 minutes", value="10min"),
+        app_commands.Choice(name="20 minutes", value="20min"),
+        app_commands.Choice(name="30 minutes", value="30min"),
+        app_commands.Choice(name="40 minutes", value="40min"),
+        app_commands.Choice(name="50 minutes", value="50min"),
+        app_commands.Choice(name="1 heure", value="1h"),
+        app_commands.Choice(name="2 heures", value="2h"),
+    ]
+}
 
 @bot.event
 async def on_ready():
