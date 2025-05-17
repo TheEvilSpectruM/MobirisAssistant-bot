@@ -70,3 +70,5 @@ async def sendmessage(interaction: discord.Interaction):
 async def on_ready():
     await tree.sync()
     print(f"✅ Connecté en tant que {bot.user}")
+
+bot.run(token)
