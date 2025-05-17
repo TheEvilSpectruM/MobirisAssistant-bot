@@ -37,7 +37,7 @@ class ClickButton(discord.ui.View):
     channel="Le salon où envoyer le message",
     message="Le contenu du message à envoyer"
 )
-@app_commands.checks.has_role("Administrateur")  # Le rôle requis, modifie si besoin
+@app_commands.checks.has_role("Administrateurs")  # Le rôle requis, modifie si besoin
 async def sendmessage(interaction: discord.Interaction, channel: discord.TextChannel, message: str):
     # Envoie le message avec un bouton et compteur initialisé à 0
     sent_message = await channel.send(
