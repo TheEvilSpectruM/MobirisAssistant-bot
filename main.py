@@ -13,8 +13,8 @@ tree = bot.tree
 # Dictionnaire pour stocker les pseudos Roblox validés
 roblox_links = {}
 roblox_embed_message = None
-PSEUDO_CHANNEL_ID = 123456789012345678  # Remplace avec l'ID de #pseudo-roblox
-THE_EVIL_SPECTRUM_ID = 987654321098765432  # Ton ID d'utilisateur (theevilspectrum)
+PSEUDO_CHANNEL_ID = 1373624458862002250  # Remplace avec l'ID de #pseudo-roblox
+THE_EVIL_SPECTRUM_ID = 1075319939306639412  # Ton ID d'utilisateur (theevilspectrum)
 
 class PseudoVerificationView(discord.ui.View):
     def __init__(self, user: discord.User, pseudo: str):
