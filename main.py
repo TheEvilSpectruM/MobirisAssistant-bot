@@ -12,10 +12,10 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 tree = bot.tree
 
 # === CONFIGURATION ===
-PSEUDO_CHANNEL_ID = 123456789012345678  # Remplace avec l'ID du salon #pseudo-roblox
-SESSION_CHANNEL_ID = 123456789012345678  # Remplace avec l'ID du salon #⫻session
-TICKETS_CHANNEL_ID = 123456789012345678  # Remplace avec l'ID du salon #tickets
-THE_EVIL_SPECTRUM_ID = 987654321098765432  # Ton ID d'utilisateur (theevilspectrum)
+PSEUDO_CHANNEL_ID = 1373624458862002250  # Remplace avec l'ID du salon #pseudo-roblox
+SESSION_CHANNEL_ID = 1373221920685948969  # Remplace avec l'ID du salon #⫻session
+TICKETS_CHANNEL_ID = 1356145309574758481  # Remplace avec l'ID du salon #tickets
+THE_EVIL_SPECTRUM_ID = 1075319939306639412  # Ton ID d'utilisateur (theevilspectrum)
 
 roblox_links = {}
 roblox_embed_message = None
