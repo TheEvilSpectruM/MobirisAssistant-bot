@@ -28,19 +28,24 @@ async def update_roblox_embed(client: discord.Client):
     if not channel:
         return
 
-    embed = discord.Embed(
-        title="📋 Liste des pseudos Roblox enregistrés",
-        color=discord.Color.blue()
-    )
     if roblox_links:
+        lines = []
         for user_id, pseudo in roblox_links.items():
             try:
                 user = await client.fetch_user(user_id)
-                embed.add_field(name=user.name, value=pseudo, inline=False)
+                # Format : Discord: @pseudoDiscord Roblox: pseudoRoblox
+                lines.append(f"Discord: {user.mention} Roblox: {pseudo}")
             except:
                 continue
+        description_text = "\n".join(lines)
     else:
-        embed.description = "Aucune donnée enregistrée."
+        description_text = "Aucune donnée enregistrée."
+
+    embed = discord.Embed(
+        title="📋 Liste des pseudos Roblox enregistrés",
+        description=description_text,
+        color=discord.Color.blue()
+    )
 
     if roblox_embed_message:
         try:
