@@ -34,12 +34,18 @@ class PseudoVerificationView(View):
         self.stop()
 
     @discord.ui.button(label="Existe", style=discord.ButtonStyle.success)
-    async def exists(self, interaction: discord.Interaction, button: Button):
-        roblox_links[self.user.id] = self.pseudo
-        await update_roblox_embed(interaction.client)
-        await interaction.response.send_message(f"✅ Ajouté: {self.user.name} → {self.pseudo}", ephemeral=False)
-        await self.user.send(f"🎉 Ton pseudo Roblox **{self.pseudo}** a été validé et ajouté à la liste.")
-        self.stop()
+async def exists(self, interaction: discord.Interaction, button: Button):
+    if self.user.id not in roblox_links:
+        roblox_links[self.user.id] = []
+
+    if self.pseudo not in roblox_links[self.user.id]:
+        roblox_links[self.user.id].append(self.pseudo)
+
+    await update_roblox_embed(interaction.client)
+    await interaction.response.send_message(f"✅ Ajouté: {self.user.name} → {self.pseudo}", ephemeral=False)
+    await self.user.send(f"🎉 Ton pseudo Roblox **{self.pseudo}** a été validé et ajouté à la liste.")
+    self.stop()
+
 
 async def update_roblox_embed(client: discord.Client):
     global roblox_embed_message
@@ -49,9 +55,10 @@ async def update_roblox_embed(client: discord.Client):
 
     embed = discord.Embed(title="📋 Liste des pseudos Roblox enregistrés", color=discord.Color.blue())
     if roblox_links:
-        for uid, pseudo in roblox_links.items():
+        for uid, pseudos in roblox_links.items():
             user = await client.fetch_user(uid)
-            embed.add_field(name=user.name, value=pseudo, inline=False)
+            pseudo_text = ", ".join(pseudos)
+            embed.add_field(name=user.name, value=pseudo_text, inline=False)
     else:
         embed.description = "Aucune donnée enregistrée."
 
