@@ -2,7 +2,7 @@ import os
 import discord
 from discord.ext import commands
 from discord import app_commands
-from discord.ui import Modal, TextInput, View, Button
+from discord.ui import Modal, TextInput, View, Button, Select
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -14,6 +14,7 @@ tree = bot.tree
 # === CONFIGURATION ===
 PSEUDO_CHANNEL_ID = 123456789012345678  # Remplace avec l'ID du salon #pseudo-roblox
 SESSION_CHANNEL_ID = 123456789012345678  # Remplace avec l'ID du salon #⫻session
+TICKETS_CHANNEL_ID = 123456789012345678  # Remplace avec l'ID du salon #tickets
 THE_EVIL_SPECTRUM_ID = 987654321098765432  # Ton ID d'utilisateur (theevilspectrum)
 
 roblox_links = {}
@@ -143,11 +144,47 @@ class SessionModal(Modal, title="Créer une session"):
 async def session(interaction: discord.Interaction):
     await interaction.response.send_modal(SessionModal())
 
-# === READY & RUN ===
+# === SYSTÈME DE TICKETS ===
+class TicketModal(Modal, title="Créer un ticket"):
+    raison = TextInput(label="Raison du ticket", placeholder="Choisis une raison", max_length=100)
+    message = TextInput(label="Décris ton problème", style=discord.TextStyle.paragraph)
+
+    def __init__(self, user):
+        super().__init__()
+        self.user = user
+
+    async def on_submit(self, interaction: discord.Interaction):
+        guild = interaction.guild
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            self.user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+            guild.get_member(THE_EVIL_SPECTRUM_ID): discord.PermissionOverwrite(view_channel=True, send_messages=True)
+        }
+        channel = await guild.create_text_channel(name=f"{self.user.name}-ticket", overwrites=overwrites)
+
+        embed = discord.Embed(title="🎫 Ticket Ouvert", description=self.message.value, color=discord.Color.blurple())
+        await channel.send(content=f"Ticket pour {self.user.mention} — <@{THE_EVIL_SPECTRUM_ID}>", embed=embed, view=TicketControlView(channel))
+        await interaction.response.send_message("✅ Ticket créé !", ephemeral=True)
+
+class TicketControlView(View):
+    def __init__(self, channel):
+        super().__init__(timeout=None)
+        self.channel = channel
+
+    @discord.ui.button(label="Fermer le ticket", style=discord.ButtonStyle.danger)
+    async def close(self, interaction: discord.Interaction, button: Button):
+        if interaction.user.id != THE_EVIL_SPECTRUM_ID:
+            await interaction.response.send_message("⛔ Seul le staff peut fermer ce ticket.", ephemeral=True)
+            return
+        await interaction.response.send_message("🔒 Ticket fermé.", ephemeral=True)
+        await self.channel.delete()
+
 @bot.event
 async def on_ready():
     await tree.sync()
     print(f"✅ Connecté en tant que {bot.user}")
+
+    # Retrouver le message embed existant si il y a
     channel = bot.get_channel(PSEUDO_CHANNEL_ID)
     if channel:
         async for message in channel.history(limit=50):
@@ -155,6 +192,18 @@ async def on_ready():
                 global roblox_embed_message
                 roblox_embed_message = message
                 break
+
+    # Message de ticket
+    ticket_channel = bot.get_channel(TICKETS_CHANNEL_ID)
+    if ticket_channel:
+        embed = discord.Embed(title="📩 Ouvrir un ticket", description="Clique ci-dessous pour ouvrir un ticket.", color=discord.Color.orange())
+        view = View()
+        async def callback(interaction: discord.Interaction):
+            await interaction.response.send_modal(TicketModal(interaction.user))
+        button = Button(label="Créer un ticket", style=discord.ButtonStyle.primary)
+        button.callback = callback
+        view.add_item(button)
+        await ticket_channel.send(embed=embed, view=view)
 
 token = os.getenv("TOKEN")
 bot.run(token)
